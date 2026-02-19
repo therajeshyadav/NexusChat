@@ -31,7 +31,7 @@ export default function Signup() {
 
   const onSubmit = async (data: FormData) => {
     setServerError('');
-    const result = await signup(data.email, data.password, data.username);
+    const result = await signup(data.username, data.email, data.password);
     if (result.error) {
       setServerError(result.error);
     } else {
