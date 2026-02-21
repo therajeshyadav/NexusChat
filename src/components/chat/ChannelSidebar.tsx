@@ -1,71 +1,242 @@
-import { Hash, Volume2, ChevronDown, Settings, Mic, Headphones } from 'lucide-react';
-import { Server, Channel } from '@/data/mockData';
-import { useAuth } from '@/context/AuthContext';
-import { useState } from 'react';
+import {
+  Hash,
+  Volume2,
+  ChevronDown,
+  Plus,
+  UserPlus,
+  Copy,
+  Edit,
+  Trash2,
+  MoreVertical,
+} from "lucide-react";
+import { Server, Channel } from "@/types/chat"; // adjust path
+import { useAuth } from "@/context/AuthContext";
+import { useState } from "react";
+import { chatApi } from "@/services/chatApi";
+import EditChannelModal from "@/components/EditChannelModal";
+import UserPanel from "@/components/shared/UserPanel";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface ChannelSidebarProps {
   server: Server;
   activeChannelId: string;
   onSelectChannel: (id: string) => void;
+  onChannelCreated: () => void;
 }
 
-export default function ChannelSidebar({ server, activeChannelId, onSelectChannel }: ChannelSidebarProps) {
+export default function ChannelSidebar({
+  server,
+  activeChannelId,
+  onSelectChannel,
+  onChannelCreated,
+}: ChannelSidebarProps) {
+  if (!server || !server.channels || server.channels.length === 0) return null;
+  
   const { user, logout } = useAuth();
-  const categories = [...new Set(server.channels.map(c => c.category))];
+  const categories = [
+    ...new Set(server.channels.map((c) => c.category || "general")),
+  ];
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [editingChannel, setEditingChannel] = useState<Channel | null>(null);
+  const [deletingChannelId, setDeletingChannelId] = useState<string | null>(null);
 
-  const toggleCategory = (cat: string) => setCollapsed(prev => ({ ...prev, [cat]: !prev[cat] }));
+  const isOwnerOrAdmin = server.ownerId === user?.id;
+
+  const toggleCategory = (cat: string) =>
+    setCollapsed((prev) => ({ ...prev, [cat]: !prev[cat] }));
+
+  const handleCreateChannel = async (category: string) => {
+    const type = category === "VOICE CHANNELS" ? "voice" : "text";
+    const name = prompt(`Enter ${type} channel name:`);
+    if (!name) return;
+
+    try {
+      await chatApi.createChannel(server._id, name, type);
+      await onChannelCreated();
+    } catch (err) {
+      console.error("Failed to create channel", err);
+    }
+  };
+
+  const handleGenerateInvite = async () => {
+    try {
+      const response = await chatApi.generateInvite(server._id);
+      const inviteCode = response.inviteCode;
+      
+      // Copy to clipboard
+      await navigator.clipboard.writeText(inviteCode);
+      alert(`Invite code copied to clipboard: ${inviteCode}`);
+    } catch (err) {
+      console.error("Failed to generate invite", err);
+      alert("Failed to generate invite code");
+    }
+  };
+
+  const handleEditChannel = async (name: string) => {
+    if (!editingChannel) return;
+    
+    try {
+      await chatApi.updateChannel(server._id, editingChannel._id, name);
+      await onChannelCreated();
+      setEditingChannel(null);
+    } catch (err) {
+      console.error("Failed to update channel", err);
+      alert("Failed to update channel");
+    }
+  };
+
+  const handleDeleteChannel = async () => {
+    if (!deletingChannelId) return;
+    
+    try {
+      await chatApi.deleteChannel(server._id, deletingChannelId);
+      await onChannelCreated();
+      setDeletingChannelId(null);
+    } catch (err: any) {
+      console.error("Failed to delete channel", err);
+      alert(err.response?.data?.message || "Failed to delete channel");
+    }
+  };
 
   return (
     <div className="flex h-full w-60 flex-col bg-discord-darker">
       {/* Server header */}
-      <button className="flex h-12 items-center justify-between border-b border-discord-darkest px-4 transition-colors hover:bg-discord-hover">
-        <span className="truncate text-sm font-semibold text-foreground">{server.name}</span>
-        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-      </button>
+      <div className="flex h-12 items-center justify-between border-b border-discord-darkest px-4">
+        <span className="truncate text-sm font-semibold text-foreground">
+          {server.name}
+        </span>
+        <button
+          onClick={handleGenerateInvite}
+          className="text-muted-foreground transition-colors hover:text-foreground"
+          title="Generate Invite Link"
+        >
+          <UserPlus className="h-4 w-4" />
+        </button>
+      </div>
 
       {/* Channel list */}
+      {/* Channel list */}
       <div className="flex-1 overflow-y-auto px-2 pt-4">
-        {categories.map(category => (
+        {categories.map((category) => (
           <div key={category} className="mb-4">
-            <button onClick={() => toggleCategory(category)} className="mb-1 flex w-full items-center gap-1 px-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground hover:text-foreground">
-              <ChevronDown className={`h-3 w-3 transition-transform ${collapsed[category] ? '-rotate-90' : ''}`} />
-              {category}
-            </button>
-            {!collapsed[category] && server.channels
-              .filter(c => c.category === category)
-              .map(channel => (
-                <button
-                  key={channel.id}
-                  onClick={() => onSelectChannel(channel.id)}
-                  className={`mb-0.5 flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-sm transition-colors ${channel.id === activeChannelId ? 'bg-discord-hover text-foreground' : 'text-muted-foreground hover:bg-discord-hover/50 hover:text-foreground'}`}
-                >
-                  {channel.type === 'text' ? <Hash className="h-4 w-4 shrink-0 opacity-70" /> : <Volume2 className="h-4 w-4 shrink-0 opacity-70" />}
-                  <span className="truncate">{channel.name}</span>
-                </button>
-              ))}
+            <div className="mb-1 flex w-full items-center justify-between px-1">
+              <button
+                onClick={() => toggleCategory(category)}
+                className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-muted-foreground hover:text-foreground"
+              >
+                <ChevronDown
+                  className={`h-3 w-3 transition-transform ${
+                    collapsed[category] ? "-rotate-90" : ""
+                  }`}
+                />
+                {category}
+              </button>
+              <button
+                onClick={() => handleCreateChannel(category)}
+                className="text-muted-foreground hover:text-foreground"
+                title="Create Channel"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+
+            {!collapsed[category] &&
+              server.channels
+                .filter((c) => (c.category || "general") === category)
+                .map((channel) => (
+                  <div
+                    key={channel._id}
+                    className={`group mb-0.5 flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-sm transition-colors ${
+                      channel._id === activeChannelId
+                        ? "bg-discord-hover text-foreground"
+                        : "text-muted-foreground hover:bg-discord-hover/50 hover:text-foreground"
+                    }`}
+                  >
+                    <button
+                      onClick={() => onSelectChannel(channel._id)}
+                      className="flex flex-1 items-center gap-1.5 overflow-hidden"
+                    >
+                      {channel.type === "text" ? (
+                        <Hash className="h-4 w-4 shrink-0 opacity-70" />
+                      ) : (
+                        <Volume2 className="h-4 w-4 shrink-0 opacity-70" />
+                      )}
+                      <span className="truncate">{channel.name}</span>
+                    </button>
+                    
+                    {isOwnerOrAdmin && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="opacity-0 group-hover:opacity-100 p-1 hover:bg-discord-hover rounded">
+                            <MoreVertical className="h-3 w-3" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setEditingChannel(channel)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit Channel
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => setDeletingChannelId(channel._id)}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete Channel
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                  </div>
+                ))}
           </div>
         ))}
       </div>
 
       {/* User panel */}
-      <div className="flex items-center gap-2 border-t border-discord-darkest bg-discord-darkest/50 px-2 py-2">
-        <div className="relative">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-            {user?.username?.charAt(0).toUpperCase() || 'U'}
-          </div>
-          <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-discord-darkest bg-discord-green" />
-        </div>
-        <div className="flex-1 overflow-hidden">
-          <p className="truncate text-sm font-medium text-foreground">{user?.username || 'User'}</p>
-          <p className="truncate text-[10px] text-muted-foreground">Online</p>
-        </div>
-        <div className="flex gap-1">
-          <button className="rounded p-1 text-muted-foreground transition-colors hover:bg-discord-hover hover:text-foreground"><Mic className="h-4 w-4" /></button>
-          <button className="rounded p-1 text-muted-foreground transition-colors hover:bg-discord-hover hover:text-foreground"><Headphones className="h-4 w-4" /></button>
-          <button onClick={logout} className="rounded p-1 text-muted-foreground transition-colors hover:bg-discord-hover hover:text-foreground" title="Logout"><Settings className="h-4 w-4" /></button>
-        </div>
-      </div>
+      <UserPanel />
+
+      {/* Edit Channel Modal */}
+      {editingChannel && (
+        <EditChannelModal
+          isOpen={!!editingChannel}
+          onClose={() => setEditingChannel(null)}
+          channelName={editingChannel.name}
+          onSave={handleEditChannel}
+        />
+      )}
+
+      {/* Delete Channel Confirmation */}
+      <AlertDialog open={!!deletingChannelId} onOpenChange={() => setDeletingChannelId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Channel</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this channel? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteChannel} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

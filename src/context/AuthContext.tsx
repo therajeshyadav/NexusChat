@@ -8,10 +8,12 @@ import React, {
 import { authApi } from "@/services/api";
 
 interface User {
-  id: string;
+  id: number;
   email: string;
   username: string;
   avatar?: string;
+  bio?: string;
+  status?: string;
 }
 
 interface AuthContextType {

@@ -1,5 +1,5 @@
 import axios from "axios";
-const API_BASE = "http://localhost:5000/api";
+const API_BASE = import.meta.env.VITE_AUTH_API_URL || "http://localhost:5000/api/auth";
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -27,7 +27,7 @@ export const authApi = {
     password: string,
   ): Promise<{ data?: any; error?: string }> => {
     try {
-      const res = await axios.post(`${API_BASE}/auth/login`, {
+      const res = await axios.post(`${API_BASE}/login`, {
         identifier,
         password,
       });
@@ -46,7 +46,7 @@ export const authApi = {
     password: string,
   ): Promise<{ data?: any; error?: string }> => {
     try {
-      const res = await axios.post(`${API_BASE}/auth/signup`, {
+      const res = await axios.post(`${API_BASE}/signup`, {
         username,
         email,
         password,
@@ -65,7 +65,7 @@ export const authApi = {
     otp: string,
   ): Promise<{ data?: any; error?: string }> => {
     try {
-      const res = await axios.post(`${API_BASE}/auth/verify-otp`, {
+      const res = await axios.post(`${API_BASE}/verify-otp`, {
         email,
         otp,
       });
@@ -81,7 +81,7 @@ export const authApi = {
   forgotPassword: async (
     email: string,
   ): Promise<ApiResponse<{ message: string }>> => {
-    const res = await axios.post(`${API_BASE}/auth/forgot-password`, { email });
+    const res = await axios.post(`${API_BASE}/forgot-password`, { email });
     return {
       data: res.data,
       status: res.status,
@@ -93,7 +93,7 @@ export const authApi = {
     password: string,
   ): Promise<{ data?: any; error?: string }> => {
     try {
-      const res = await axios.post(`${API_BASE}/auth/reset-password`, {
+      const res = await axios.post(`${API_BASE}/reset-password`, {
         token,
         password,
       });
@@ -107,15 +107,15 @@ export const authApi = {
   },
 
   googleAuth: () => {
-    window.location.href = `${API_BASE}/auth/google`;
+    window.location.href = `${API_BASE}/google`;
   },
 
   githubAuth: () => {
-    window.location.href = `${API_BASE}/auth/github`;
+    window.location.href = `${API_BASE}/github`;
   },
 
   validateToken: async (token: string) => {
-    const res = await axios.get(`${API_BASE}/auth/validate`, {
+    const res = await axios.get(`${API_BASE}/validate`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -128,10 +128,46 @@ export const authApi = {
   },
 
   getMe: (token: string) =>
-  axios.get(`${API_BASE}/auth/me`, {
+  axios.get(`${API_BASE}/me`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
   }),
+
+  updateProfile: async (
+    token: string,
+    data: {
+      bio?: string;
+      status?: string;
+      avatar?: File;
+      banner?: File;
+    }
+  ): Promise<{ data?: any; error?: string }> => {
+    try {
+      const formData = new FormData();
+      
+      if (data.bio !== undefined) formData.append("bio", data.bio);
+      if (data.status !== undefined) formData.append("status", data.status);
+      if (data.avatar) formData.append("avatar", data.avatar);
+      if (data.banner) formData.append("banner", data.banner);
+
+      const res = await axios.put(
+        `http://localhost:5000/api/profile/update`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      return { data: res.data };
+    } catch (err: any) {
+      return {
+        error: err.response?.data?.message || "Profile update failed",
+      };
+    }
+  },
 
 };
