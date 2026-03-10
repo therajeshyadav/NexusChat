@@ -1,5 +1,5 @@
 import axios from "axios";
-const API_BASE = import.meta.env.VITE_AUTH_API_URL || "http://localhost:5000/api/auth";
+import { API_CONFIG } from "@/config/api";
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -27,7 +27,7 @@ export const authApi = {
     password: string,
   ): Promise<{ data?: any; error?: string }> => {
     try {
-      const res = await axios.post(`${API_BASE}/login`, {
+      const res = await axios.post(`${API_CONFIG.authApiUrl}/login`, {
         identifier,
         password,
       });
@@ -46,7 +46,7 @@ export const authApi = {
     password: string,
   ): Promise<{ data?: any; error?: string }> => {
     try {
-      const res = await axios.post(`${API_BASE}/signup`, {
+      const res = await axios.post(`${API_CONFIG.authApiUrl}/signup`, {
         username,
         email,
         password,
@@ -65,7 +65,7 @@ export const authApi = {
     otp: string,
   ): Promise<{ data?: any; error?: string }> => {
     try {
-      const res = await axios.post(`${API_BASE}/verify-otp`, {
+      const res = await axios.post(`${API_CONFIG.authApiUrl}/verify-otp`, {
         email,
         otp,
       });
@@ -81,7 +81,7 @@ export const authApi = {
   forgotPassword: async (
     email: string,
   ): Promise<ApiResponse<{ message: string }>> => {
-    const res = await axios.post(`${API_BASE}/forgot-password`, { email });
+    const res = await axios.post(`${API_CONFIG.authApiUrl}/forgot-password`, { email });
     return {
       data: res.data,
       status: res.status,
@@ -93,7 +93,7 @@ export const authApi = {
     password: string,
   ): Promise<{ data?: any; error?: string }> => {
     try {
-      const res = await axios.post(`${API_BASE}/reset-password`, {
+      const res = await axios.post(`${API_CONFIG.authApiUrl}/reset-password`, {
         token,
         password,
       });
@@ -107,15 +107,15 @@ export const authApi = {
   },
 
   googleAuth: () => {
-    window.location.href = `${API_BASE}/google`;
+    window.location.href = `${API_CONFIG.authApiUrl}/google`;
   },
 
   githubAuth: () => {
-    window.location.href = `${API_BASE}/github`;
+    window.location.href = `${API_CONFIG.authApiUrl}/github`;
   },
 
   validateToken: async (token: string) => {
-    const res = await axios.get(`${API_BASE}/validate`, {
+    const res = await axios.get(`${API_CONFIG.authApiUrl}/validate`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -128,7 +128,7 @@ export const authApi = {
   },
 
   getMe: (token: string) =>
-  axios.get(`${API_BASE}/me`, {
+  axios.get(`${API_CONFIG.authApiUrl}/me`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -151,8 +151,10 @@ export const authApi = {
       if (data.avatar) formData.append("avatar", data.avatar);
       if (data.banner) formData.append("banner", data.banner);
 
+      // Use smart API URL for profile updates too
+      const profileApiUrl = API_CONFIG.authApiUrl.replace('/auth', '/profile');
       const res = await axios.put(
-        `http://localhost:5000/api/profile/update`,
+        `${profileApiUrl}/update`,
         formData,
         {
           headers: {

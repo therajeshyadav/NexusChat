@@ -1,18 +1,47 @@
 import { useState, useEffect } from "react";
 import { Server, Message, Channel, Member } from "@/types/chat";
 import { useAuth } from "@/context/AuthContext";
+import { useCallContext } from "@/context/CallContext";
+import { useVoiceChannel } from "@/hooks/useVoiceChannel";
 import ServerSidebar from "@/components/chat/ServerSidebar";
 import ChannelSidebar from "@/components/chat/ChannelSidebar";
 import ChatArea from "@/components/chat/ChatArea";
+import VoiceChannelArea from "@/components/chat/VoiceChannelArea";
 import MembersSidebar from "@/components/chat/MembersSidebar";
 import DMSidebar from "@/components/dm/DMSidebar";
+import DMChatArea from "@/components/dm/DMChatArea";
 import FriendProfile from "@/components/dm/FriendProfile";
+import CallModal from "@/components/dm/CallModal";
+import ActiveCallModal from "@/components/dm/ActiveCallModal";
 import Friends from "@/pages/Friends";
 import { chatApi } from "@/services/chatApi";
 import { socketService } from "@/services/socket";
 
 export default function Chat() {
   const { user, token } = useAuth();
+  const {
+    callState,
+    currentCall,
+    isIncoming,
+    isMuted,
+    isVideoOff,
+    localVideoRef,
+    remoteVideoRef,
+    startCall,
+    answerCall,
+    rejectCall,
+    endCall,
+    toggleMute,
+    toggleVideo,
+  } = useCallContext();
+
+  const {
+    voiceState,
+    joinVoiceChannel,
+    leaveVoiceChannel,
+    toggleMute: toggleVoiceMute,
+    toggleDeafen,
+  } = useVoiceChannel();
 
   const [servers, setServers] = useState<Server[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -24,6 +53,7 @@ export default function Chat() {
   
   // DM state
   const [activeDM, setActiveDM] = useState<{ id: string; friendId: number; friendUsername: string } | null>(null);
+  const [showDMProfile, setShowDMProfile] = useState(true);
 
   useEffect(() => {
     const fetchServers = async () => {
@@ -43,17 +73,6 @@ export default function Chat() {
 
     fetchServers();
   }, []);
-
-  // Socket connection
-  useEffect(() => {
-    if (token) {
-      socketService.connect(token);
-    }
-
-    return () => {
-      socketService.disconnect();
-    };
-  }, [token]);
 
   // Channel/DM messages and socket listeners
   useEffect(() => {
@@ -213,14 +232,25 @@ export default function Chat() {
           />
 
           {activeChannel ? (
-            <ChatArea
-              channel={activeChannel}
-              messages={channelMessages}
-              members={members}
-              onSendMessage={handleSendMessage}
-              onToggleMembers={() => setShowMembers(!showMembers)}
-              showMembers={showMembers}
-            />
+            activeChannel.type === 'voice' ? (
+              <VoiceChannelArea
+                channel={activeChannel}
+                voiceState={voiceState}
+                onJoinChannel={() => joinVoiceChannel(activeChannel._id)}
+                onLeaveChannel={leaveVoiceChannel}
+                onToggleMute={toggleVoiceMute}
+                onToggleDeafen={toggleDeafen}
+              />
+            ) : (
+              <ChatArea
+                channel={activeChannel}
+                messages={channelMessages}
+                members={members}
+                onSendMessage={handleSendMessage}
+                onToggleMembers={() => setShowMembers(!showMembers)}
+                showMembers={showMembers}
+              />
+            )
           ) : (
             <div className="flex flex-1 items-center justify-center text-gray-400">
               Select or create a channel
@@ -244,28 +274,69 @@ export default function Chat() {
             onSelectDM={handleSelectDM}
             onShowFriends={handleShowFriends}
           />
-          <ChatArea
-            channel={{
-              _id: activeDM.id,
-              name: activeDM.friendUsername,
-              type: "dm",
-            }}
+          <DMChatArea
+            friendId={activeDM.friendId}
+            friendUsername={activeDM.friendUsername}
+            dmId={activeDM.id}
             messages={messages.filter(m => m.channelId === activeDM.id)}
             members={[
               { _id: activeDM.friendId.toString(), username: activeDM.friendUsername, status: "online" },
               { _id: user?.id.toString() || "", username: user?.username || "", status: "online" },
             ]}
             onSendMessage={handleSendMessage}
-            onToggleMembers={() => {}}
-            showMembers={false}
+            onToggleProfile={() => setShowDMProfile(!showDMProfile)}
+            showProfile={showDMProfile}
+            onStartCall={startCall}
           />
-          <FriendProfile
-            friendId={activeDM.friendId}
-            friendUsername={activeDM.friendUsername}
-          />
+          {showDMProfile && (
+            <FriendProfile
+              friendId={activeDM.friendId}
+              friendUsername={activeDM.friendUsername}
+            />
+          )}
         </>
       ) : (
         <Friends onOpenDM={handleOpenDM} />
+      )}
+
+      {/* Incoming Call Modal */}
+      {isIncoming && currentCall && (
+        <CallModal
+          isOpen={true}
+          callType={currentCall.callType}
+          callerUsername={currentCall.friendUsername}
+          isIncoming={true}
+          onAccept={answerCall}
+          onReject={rejectCall}
+        />
+      )}
+
+      {/* Outgoing Call Modal */}
+      {callState === 'calling' && !isIncoming && currentCall && (
+        <CallModal
+          isOpen={true}
+          callType={currentCall.callType}
+          callerUsername={currentCall.friendUsername}
+          isIncoming={false}
+          onReject={endCall}
+        />
+      )}
+
+      {/* Active Call Modal */}
+      {callState === 'connected' && currentCall && (
+        <ActiveCallModal
+          isOpen={true}
+          callType={currentCall.callType}
+          friendUsername={currentCall.friendUsername}
+          isConnected={true}
+          isMuted={isMuted}
+          isVideoOff={isVideoOff}
+          localVideoRef={localVideoRef}
+          remoteVideoRef={remoteVideoRef}
+          onToggleMute={toggleMute}
+          onToggleVideo={toggleVideo}
+          onEndCall={endCall}
+        />
       )}
     </div>
   );

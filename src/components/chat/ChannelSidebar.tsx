@@ -15,6 +15,8 @@ import { useState } from "react";
 import { chatApi } from "@/services/chatApi";
 import EditChannelModal from "@/components/EditChannelModal";
 import UserPanel from "@/components/shared/UserPanel";
+import VoiceChannelPanel from "@/components/chat/VoiceChannelPanel";
+import { useVoiceChannel } from "@/hooks/useVoiceChannel";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,8 +50,14 @@ export default function ChannelSidebar({
   if (!server || !server.channels || server.channels.length === 0) return null;
   
   const { user, logout } = useAuth();
+  const { voiceState, joinVoiceChannel, leaveVoiceChannel, toggleMute, toggleDeafen } = useVoiceChannel();
+  
   const categories = [
-    ...new Set(server.channels.map((c) => c.category || "general")),
+    "TEXT CHANNELS",
+    "VOICE CHANNELS",
+    ...new Set(server.channels.map((c) => c.category || "general").filter(cat => 
+      cat !== "general" && !cat.toUpperCase().includes("TEXT") && !cat.toUpperCase().includes("VOICE")
+    )),
   ];
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [editingChannel, setEditingChannel] = useState<Channel | null>(null);
@@ -61,12 +69,13 @@ export default function ChannelSidebar({
     setCollapsed((prev) => ({ ...prev, [cat]: !prev[cat] }));
 
   const handleCreateChannel = async (category: string) => {
-    const type = category === "VOICE CHANNELS" ? "voice" : "text";
+    const isVoiceCategory = category.toUpperCase().includes("VOICE");
+    const type = isVoiceCategory ? "voice" : "text";
     const name = prompt(`Enter ${type} channel name:`);
     if (!name) return;
 
     try {
-      await chatApi.createChannel(server._id, name, type);
+      await chatApi.createChannel(server._id, name, type, category);
       await onChannelCreated();
     } catch (err) {
       console.error("Failed to create channel", err);
@@ -97,6 +106,25 @@ export default function ChannelSidebar({
     } catch (err) {
       console.error("Failed to update channel", err);
       alert("Failed to update channel");
+    }
+  };
+
+  const handleChannelClick = (channel: Channel) => {
+    if (channel.type === 'voice') {
+      // Handle voice channel join/leave
+      if (voiceState.channelId === channel._id) {
+        // Already in this voice channel, leave it
+        leaveVoiceChannel();
+      } else {
+        // Join this voice channel (leave current one if any)
+        if (voiceState.isConnected) {
+          leaveVoiceChannel();
+        }
+        joinVoiceChannel(channel._id);
+      }
+    } else {
+      // Regular text channel
+      onSelectChannel(channel._id);
     }
   };
 
@@ -157,26 +185,41 @@ export default function ChannelSidebar({
 
             {!collapsed[category] &&
               server.channels
-                .filter((c) => (c.category || "general") === category)
+                .filter((c) => {
+                  if (category === "TEXT CHANNELS") {
+                    return c.type === "text" || !c.type; // Default to text if no type
+                  } else if (category === "VOICE CHANNELS") {
+                    return c.type === "voice";
+                  } else {
+                    return (c.category || "general") === category;
+                  }
+                })
                 .map((channel) => (
                   <div
                     key={channel._id}
                     className={`group mb-0.5 flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-sm transition-colors ${
-                      channel._id === activeChannelId
+                      channel.type === 'voice' && voiceState.channelId === channel._id
+                        ? "bg-green-600/20 text-green-400"
+                        : channel._id === activeChannelId
                         ? "bg-discord-hover text-foreground"
                         : "text-muted-foreground hover:bg-discord-hover/50 hover:text-foreground"
                     }`}
                   >
                     <button
-                      onClick={() => onSelectChannel(channel._id)}
+                      onClick={() => handleChannelClick(channel)}
                       className="flex flex-1 items-center gap-1.5 overflow-hidden"
                     >
                       {channel.type === "text" ? (
                         <Hash className="h-4 w-4 shrink-0 opacity-70" />
                       ) : (
-                        <Volume2 className="h-4 w-4 shrink-0 opacity-70" />
+                        <Volume2 className={`h-4 w-4 shrink-0 ${
+                          voiceState.channelId === channel._id ? 'text-green-400' : 'opacity-70'
+                        }`} />
                       )}
                       <span className="truncate">{channel.name}</span>
+                      {channel.type === 'voice' && voiceState.channelId === channel._id && (
+                        <span className="text-xs text-green-400">({voiceState.users.length + 1})</span>
+                      )}
                     </button>
                     
                     {isOwnerOrAdmin && (
@@ -206,6 +249,14 @@ export default function ChannelSidebar({
           </div>
         ))}
       </div>
+
+      {/* Voice Channel Panel */}
+      <VoiceChannelPanel
+        voiceState={voiceState}
+        onToggleMute={toggleMute}
+        onToggleDeafen={toggleDeafen}
+        onLeaveChannel={leaveVoiceChannel}
+      />
 
       {/* User panel */}
       <UserPanel />

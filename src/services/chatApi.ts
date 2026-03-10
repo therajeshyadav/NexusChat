@@ -18,8 +18,8 @@ export const chatApi = {
   deleteServer: (serverId: string) =>
     api.delete(`/servers/${serverId}`).then((res) => res.data),
 
-  createChannel: (serverId: string, name: string, type: "text" | "voice") =>
-    api.post(`/servers/${serverId}/channels`, { name, type }).then((res) => res.data),
+  createChannel: (serverId: string, name: string, type: "text" | "voice", category?: string) =>
+    api.post(`/servers/${serverId}/channels`, { name, type, category }).then((res) => res.data),
 
   updateChannel: (serverId: string, channelId: string, name: string) =>
     api.put(`/servers/${serverId}/channels/${channelId}`, { name }).then((res) => res.data),

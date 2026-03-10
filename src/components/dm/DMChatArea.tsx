@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import {
-  Hash,
+  Phone,
+  Video,
   Pin,
   Users,
   Search,
@@ -12,17 +13,21 @@ import {
   X,
 } from "lucide-react";
 import EmojiPicker from "emoji-picker-react";
-import { Channel, Message, Member } from "@/types/chat";
+import { Message, Member } from "@/types/chat";
 import { useAuth } from "@/context/AuthContext";
 import { chatApi } from "@/services/chatApi";
+import { socketService } from "@/services/socket";
 
-interface ChatAreaProps {
-  channel: Channel;
+interface DMChatAreaProps {
+  friendId: number;
+  friendUsername: string;
+  dmId: string;
   messages: Message[];
   members: Member[];
   onSendMessage: (content: string, attachments?: any[]) => void;
-  onToggleMembers: () => void;
-  showMembers: boolean;
+  onToggleProfile: () => void;
+  showProfile: boolean;
+  onStartCall?: (friendId: number, friendUsername: string, callType: 'voice' | 'video') => void;
 }
 
 function formatTime(iso: string) {
@@ -50,16 +55,17 @@ function getAvatarColor(id: string) {
   return colors[parseInt(id) % colors.length];
 }
 
-export default function ChatArea({
-  channel,
+export default function DMChatArea({
+  friendId,
+  friendUsername,
+  dmId,
   messages,
   members,
   onSendMessage,
-  onToggleMembers,
-  showMembers,
-}: ChatAreaProps) {
-  if (!channel) return null;
-
+  onToggleProfile,
+  showProfile,
+  onStartCall,
+}: DMChatAreaProps) {
   const [input, setInput] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<any[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -69,7 +75,6 @@ export default function ChatArea({
   const { user } = useAuth();
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
-  // Helper to get username from senderId
   const getUsernameById = (senderId: string) => {
     if (senderId === user?.id.toString()) {
       return user.username;
@@ -82,7 +87,6 @@ export default function ChatArea({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Close emoji picker when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -144,26 +148,54 @@ export default function ChatArea({
     }
   };
 
-  //emoji handler
   const handleEmojiClick = (emojiData: any) => {
     setInput((prev) => prev + emojiData.emoji);
   };
 
+  const handleVoiceCall = () => {
+    if (onStartCall) {
+      onStartCall(friendId, friendUsername, 'voice');
+    }
+  };
+
+  const handleVideoCall = () => {
+    if (onStartCall) {
+      onStartCall(friendId, friendUsername, 'video');
+    }
+  };
+
   return (
     <div className="flex h-full flex-1 flex-col bg-discord-chat-bg">
-      {/* Channel header */}
+      {/* DM header */}
       <div className="flex h-12 items-center justify-between border-b border-discord-darkest px-4">
         <div className="flex items-center gap-2">
-          <Hash className="h-5 w-5 text-muted-foreground" />
-          <span className="font-semibold text-foreground">{channel.name}</span>
+          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+            {friendUsername.charAt(0).toUpperCase()}
+          </div>
+          <span className="font-semibold text-foreground">{friendUsername}</span>
         </div>
         <div className="flex items-center gap-3">
+          <button 
+            onClick={handleVoiceCall}
+            className="text-muted-foreground transition-colors hover:text-foreground"
+            title="Start voice call"
+          >
+            <Phone className="h-5 w-5" />
+          </button>
+          <button 
+            onClick={handleVideoCall}
+            className="text-muted-foreground transition-colors hover:text-foreground"
+            title="Start video call"
+          >
+            <Video className="h-5 w-5" />
+          </button>
           <button className="text-muted-foreground transition-colors hover:text-foreground">
             <Pin className="h-5 w-5" />
           </button>
           <button
-            onClick={onToggleMembers}
-            className={`transition-colors ${showMembers ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            onClick={onToggleProfile}
+            className={`transition-colors ${showProfile ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            title="Toggle user profile"
           >
             <Users className="h-5 w-5" />
           </button>
@@ -181,12 +213,14 @@ export default function ChatArea({
       <div className="flex-1 overflow-y-auto px-4 py-4">
         {messages.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center text-muted-foreground">
-            <Hash className="mb-2 h-16 w-16 opacity-30" />
+            <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-primary text-3xl font-bold text-primary-foreground">
+              {friendUsername.charAt(0).toUpperCase()}
+            </div>
             <h3 className="text-xl font-bold text-foreground">
-              Welcome to #{channel.name}!
+              {friendUsername}
             </h3>
             <p className="text-sm">
-              This is the start of the #{channel.name} channel.
+              This is the beginning of your direct message history with @{friendUsername}.
             </p>
           </div>
         )}
@@ -253,19 +287,14 @@ export default function ChatArea({
                         <div key={idx}>
                           {attachment.type === "image" ? (
                             <img
-                              src={`${import.meta.env.VITE_SOCKET_URL || "http://localhost:5001"}${attachment.url}`}
+                              src={attachment.url}
                               alt="attachment"
                               className="max-h-64 max-w-sm rounded-lg cursor-pointer hover:opacity-90"
-                              onClick={() =>
-                                window.open(
-                                  `${import.meta.env.VITE_SOCKET_URL || "http://localhost:5001"}${attachment.url}`,
-                                  "_blank",
-                                )
-                              }
+                              onClick={() => window.open(attachment.url, "_blank")}
                             />
                           ) : (
                             <a
-                              href={`${import.meta.env.VITE_SOCKET_URL || "http://localhost:5001"}${attachment.url}`}
+                              href={attachment.url}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex items-center gap-2 rounded-lg bg-discord-hover px-3 py-2 text-sm hover:bg-discord-hover/70"
@@ -288,14 +317,12 @@ export default function ChatArea({
 
       {/* Message input */}
       <div className="relative px-4 pb-6">
-        {/* Emoji Picker */}
         {showEmojiPicker && (
           <div ref={emojiPickerRef} className="absolute bottom-16 right-4 z-50">
             <EmojiPicker onEmojiClick={handleEmojiClick} />
           </div>
         )}
 
-        {/* File preview */}
         {uploadedFiles.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-2">
             {uploadedFiles.map((file, idx) => (
@@ -305,7 +332,7 @@ export default function ChatArea({
               >
                 {file.type === "image" ? (
                   <img
-                    src={`${import.meta.env.VITE_SOCKET_URL || "http://localhost:5001"}${file.url}`}
+                    src={file.url}
                     alt="preview"
                     className="h-20 w-20 rounded object-cover"
                   />
@@ -347,7 +374,7 @@ export default function ChatArea({
             onKeyDown={handleKeyDown}
             rows={1}
             className="max-h-32 flex-1 resize-none bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-            placeholder={`Message #${channel.name}`}
+            placeholder={`Message @${friendUsername}`}
           />
           <button className="text-muted-foreground transition-colors hover:text-foreground">
             <ImagePlus className="h-5 w-5" />

@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/context/AuthContext";
+import { CallProvider } from "@/context/CallContext";
+import GlobalCallModals from "@/components/GlobalCallModals";
 import PrivateRoute from "@/routes/PrivateRoute";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -25,17 +27,20 @@ const App = () => (
       <Sonner />
       <AuthProvider>
         <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-            <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
-            <Route path="/verify-email" element={<VerifyEmail />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/chat" element={<PrivateRoute><Chat /></PrivateRoute>} />
-            <Route path="/auth-success" element={<OAuthSuccess />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <CallProvider>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+              <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
+              <Route path="/verify-email" element={<VerifyEmail />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/chat" element={<PrivateRoute><Chat /></PrivateRoute>} />
+              <Route path="/auth-success" element={<OAuthSuccess />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            <GlobalCallModals />
+          </CallProvider>
         </BrowserRouter>
       </AuthProvider>
     </TooltipProvider>

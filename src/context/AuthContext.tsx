@@ -6,6 +6,7 @@ import React, {
   useCallback,
 } from "react";
 import { authApi } from "@/services/api";
+import { socketService } from "@/services/socket";
 
 interface User {
   id: number;
@@ -78,6 +79,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .getMe(storedToken)
       .then((res) => {
         setUser(res.data);
+        // Connect socket after user is authenticated
+        socketService.connect(storedToken);
       })
       .catch(() => {
         localStorage.removeItem("auth_token");
@@ -87,6 +90,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .finally(() => {
         setIsLoading(false);
       });
+    
+    return () => {
+      // Disconnect socket on unmount
+      socketService.disconnect();
+    };
   }, []);
 
   const login = useCallback(async (identifier: string, password: string) => {

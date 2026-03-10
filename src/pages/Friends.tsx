@@ -3,7 +3,10 @@ import { Users, UserPlus, Search } from "lucide-react";
 import AddFriendPage from "@/components/AddFriendPage";
 import FriendsList from "@/components/FriendsList";
 import SelectFriendsModal from "@/components/SelectFriendsModal";
+import CallModal from "@/components/dm/CallModal";
+import ActiveCallModal from "@/components/dm/ActiveCallModal";
 import { useAuth } from "@/context/AuthContext";
+import { useCallContext } from "@/context/CallContext";
 import { chatApi } from "@/services/chatApi";
 import { socketService } from "@/services/socket";
 import UserPanel from "@/components/shared/UserPanel";
@@ -20,6 +23,23 @@ export default function Friends({ onOpenDM }: FriendsProps) {
   const [pendingCount, setPendingCount] = useState(0);
   const [acceptedFriends, setAcceptedFriends] = useState<any[]>([]);
   const { user } = useAuth();
+
+  // Import useCall hook for receiving calls on Friends page
+  const {
+    callState,
+    currentCall,
+    isIncoming,
+    isMuted,
+    isVideoOff,
+    localVideoRef,
+    remoteVideoRef,
+    startCall,
+    answerCall,
+    rejectCall,
+    endCall,
+    toggleMute,
+    toggleVideo,
+  } = useCallContext();
 
   useEffect(() => {
     loadPendingCount();
@@ -264,6 +284,46 @@ export default function Friends({ onOpenDM }: FriendsProps) {
           </div>
         </div>
       </div>
+
+      {/* Incoming Call Modal */}
+      {isIncoming && currentCall && (
+        <CallModal
+          isOpen={true}
+          callType={currentCall.callType}
+          callerUsername={currentCall.friendUsername}
+          isIncoming={true}
+          onAccept={answerCall}
+          onReject={rejectCall}
+        />
+      )}
+
+      {/* Outgoing Call Modal */}
+      {callState === 'calling' && !isIncoming && currentCall && (
+        <CallModal
+          isOpen={true}
+          callType={currentCall.callType}
+          callerUsername={currentCall.friendUsername}
+          isIncoming={false}
+          onReject={endCall}
+        />
+      )}
+
+      {/* Active Call Modal */}
+      {callState === 'connected' && currentCall && (
+        <ActiveCallModal
+          isOpen={true}
+          callType={currentCall.callType}
+          friendUsername={currentCall.friendUsername}
+          isConnected={true}
+          isMuted={isMuted}
+          isVideoOff={isVideoOff}
+          localVideoRef={localVideoRef}
+          remoteVideoRef={remoteVideoRef}
+          onToggleMute={toggleMute}
+          onToggleVideo={toggleVideo}
+          onEndCall={endCall}
+        />
+      )}
     </div>
   );
 }
