@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import EmojiPicker from "emoji-picker-react";
 import { Channel, Message, Member } from "@/types/chat";
+import { API_CONFIG } from "@/config/api";
 import { useAuth } from "@/context/AuthContext";
 import { chatApi } from "@/services/chatApi";
 
@@ -253,19 +254,19 @@ export default function ChatArea({
                         <div key={idx}>
                           {attachment.type === "image" ? (
                             <img
-                              src={`${import.meta.env.VITE_SOCKET_URL || "http://localhost:5001"}${attachment.url}`}
+                              src={`${API_CONFIG.socketUrl}${attachment.url}`}
                               alt="attachment"
                               className="max-h-64 max-w-sm rounded-lg cursor-pointer hover:opacity-90"
                               onClick={() =>
                                 window.open(
-                                  `${import.meta.env.VITE_SOCKET_URL || "http://localhost:5001"}${attachment.url}`,
+                                  `${API_CONFIG.socketUrl}${attachment.url}`,
                                   "_blank",
                                 )
                               }
                             />
                           ) : (
                             <a
-                              href={`${import.meta.env.VITE_SOCKET_URL || "http://localhost:5001"}${attachment.url}`}
+                              href={`${API_CONFIG.socketUrl}${attachment.url}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex items-center gap-2 rounded-lg bg-discord-hover px-3 py-2 text-sm hover:bg-discord-hover/70"
@@ -305,7 +306,7 @@ export default function ChatArea({
               >
                 {file.type === "image" ? (
                   <img
-                    src={`${import.meta.env.VITE_SOCKET_URL || "http://localhost:5001"}${file.url}`}
+                    src={`${API_CONFIG.socketUrl}${file.url}`}
                     alt="preview"
                     className="h-20 w-20 rounded object-cover"
                   />

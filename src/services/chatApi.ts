@@ -1,7 +1,5 @@
 import { api } from "./axios";
 
-const BASE_URL = "http://localhost:5001/api";
-
 export const chatApi = {
   getServers: () =>
     api.get("/servers").then((res) => res.data),

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import UserProfileModal from "@/components/profile/UserProfileModal";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { API_CONFIG } from "@/config/api";
 
 interface UserPanelProps {
   pendingCount?: number;
@@ -16,7 +17,10 @@ export default function UserPanel({ pendingCount, onPendingClick }: UserPanelPro
   const getImageUrl = (path: string | null | undefined) => {
     if (!path) return undefined;
     if (path.startsWith('http')) return path;
-    return `http://localhost:5000${path}`;
+    
+    // Use the auth API base URL (remove /api/auth to get base URL)
+    const baseUrl = API_CONFIG.authApiUrl.replace('/api/auth', '');
+    return `${baseUrl}${path}`;
   };
 
   return (

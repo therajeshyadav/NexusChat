@@ -1,5 +1,18 @@
-// Smart API URL detection for localhost + IP testing
+// Smart API URL detection for development and production
 const getApiUrls = () => {
+  // Check if we're in production (Vercel sets NODE_ENV)
+  const isProduction = import.meta.env.PROD;
+  
+  if (isProduction) {
+    // Production: Use environment variables
+    return {
+      authApiUrl: import.meta.env.VITE_AUTH_API_URL || 'https://your-auth-service.onrender.com/api/auth',
+      chatApiUrl: import.meta.env.VITE_API_BASE_URL || 'https://your-chat-service.onrender.com/api',
+      socketUrl: import.meta.env.VITE_SOCKET_URL || 'https://your-chat-service.onrender.com',
+    };
+  }
+  
+  // Development: Smart localhost/IP detection
   const hostname = window.location.hostname;
   const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
   
@@ -25,6 +38,7 @@ export const API_CONFIG = getApiUrls();
 
 // Log current configuration for debugging
 console.log('🔧 API Configuration:', {
+  environment: import.meta.env.PROD ? 'production' : 'development',
   hostname: window.location.hostname,
   isLocalhost: window.location.hostname === 'localhost',
   config: API_CONFIG

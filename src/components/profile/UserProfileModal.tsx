@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast } from "sonner";
+import { API_CONFIG } from "@/config/api";
 
 interface UserProfileModalProps {
   isOpen: boolean;
@@ -29,7 +30,10 @@ export default function UserProfileModal({ isOpen, onClose }: UserProfileModalPr
   const getImageUrl = (path: string | null | undefined) => {
     if (!path) return null;
     if (path.startsWith('http')) return path;
-    return `http://localhost:5000${path}`;
+    
+    // Use the auth API base URL (remove /api/auth to get base URL)
+    const baseUrl = API_CONFIG.authApiUrl.replace('/api/auth', '');
+    return `${baseUrl}${path}`;
   };
   
   const [profileImage, setProfileImage] = useState<string | null>(getImageUrl(user?.avatar));
