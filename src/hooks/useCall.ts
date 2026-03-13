@@ -89,6 +89,7 @@ export function useCall() {
       console.log('🎤 Remote stream audio tracks:', stream.getAudioTracks().length);
       console.log('📹 Remote stream video tracks:', stream.getVideoTracks().length);
       
+      // Only set the stream once we have the complete stream
       setRemoteStream(stream);
       setCallState('connected');
       

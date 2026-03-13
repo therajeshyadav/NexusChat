@@ -359,6 +359,9 @@ export class WebRTCManager {
       onError: !!this.onErrorCallback
     });
     
+    // Reset remote stream for new connection
+    this.remoteStream = null;
+    
     // Enhanced configuration for local and mobile network testing
     const config = {
       ...DEFAULT_CONFIG,
@@ -389,30 +392,39 @@ export class WebRTCManager {
       console.log('🎵 Has onRemoteStreamCallback:', !!this.onRemoteStreamCallback);
       
       if (event.streams && event.streams[0]) {
-        this.remoteStream = event.streams[0];
-        console.log('✅ Remote stream set');
+        // Initialize remote stream if not exists
+        if (!this.remoteStream) {
+          this.remoteStream = new MediaStream();
+          console.log('🔧 Created new remote stream');
+        }
+        
+        // Add the track to our accumulated stream (avoid duplicates)
+        const existingTrack = this.remoteStream.getTracks().find(t => t.id === event.track.id);
+        if (!existingTrack) {
+          this.remoteStream.addTrack(event.track);
+          console.log('➕ Added track to remote stream:', event.track.kind);
+        }
+        
+        console.log('✅ Remote stream updated');
         console.log('🎤 Remote audio tracks:', this.remoteStream.getAudioTracks().length);
         console.log('📹 Remote video tracks:', this.remoteStream.getVideoTracks().length);
         
-        // Log each audio track and ensure they're enabled
-        this.remoteStream.getAudioTracks().forEach((track, index) => {
-          console.log(`🎤 Audio track ${index}:`, {
-            id: track.id,
-            enabled: track.enabled,
-            muted: track.muted,
-            readyState: track.readyState
-          });
-          
-          // Force enable the track
-          track.enabled = true;
-          console.log(`🔧 Force enabled audio track ${index}`);
-        });
+        // Force enable the track
+        event.track.enabled = true;
+        console.log(`🔧 Force enabled ${event.track.kind} track:`, event.track.id);
         
-        if (this.onRemoteStreamCallback) {
-          console.log('📞 Calling onRemoteStreamCallback');
+        // Only call callback when we have both audio and video for video calls, or just audio for voice calls
+        const hasAudio = this.remoteStream.getAudioTracks().length > 0;
+        const hasVideo = this.remoteStream.getVideoTracks().length > 0;
+        const isVideoCall = this.callType === 'video';
+        
+        const shouldTriggerCallback = isVideoCall ? (hasAudio && hasVideo) : hasAudio;
+        
+        if (shouldTriggerCallback && this.onRemoteStreamCallback) {
+          console.log('📞 Calling onRemoteStreamCallback with complete stream');
           this.onRemoteStreamCallback(this.remoteStream);
         } else {
-          console.error('❌ No onRemoteStreamCallback registered!');
+          console.log('⏳ Waiting for more tracks...', { hasAudio, hasVideo, isVideoCall, shouldTrigger: shouldTriggerCallback });
         }
       } else {
         console.warn('⚠️ No streams in track event');
