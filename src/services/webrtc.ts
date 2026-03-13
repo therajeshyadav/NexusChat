@@ -11,18 +11,17 @@ interface CallConfig {
 
 const DEFAULT_CONFIG: CallConfig = {
   iceServers: [
-    // Google STUN servers
+    // Multiple STUN servers for redundancy
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
     { urls: 'stun:stun3.l.google.com:19302' },
     { urls: 'stun:stun4.l.google.com:19302' },
     
-    // Additional STUN servers for better connectivity
+    // Cloudflare STUN (fast & reliable)
     { urls: 'stun:stun.cloudflare.com:3478' },
-    { urls: 'stun:stun.nextcloud.com:443' },
     
-    // Multiple TURN servers for better connectivity
+    // Multiple TURN servers for NAT traversal
     {
       urls: 'turn:openrelay.metered.ca:80',
       username: 'openrelayproject',
@@ -39,14 +38,17 @@ const DEFAULT_CONFIG: CallConfig = {
       credential: 'openrelayproject',
     },
     
-    // Additional TURN servers
+    // Additional reliable TURN servers
     {
       urls: 'turn:relay1.expressturn.com:3478',
       username: 'ef3CYGPKLM2X2LC40V',
       credential: 'Hj8pDKpz92KmF5r6',
     },
+    
+    // Twilio STUN (enterprise grade)
+    { urls: 'stun:global.stun.twilio.com:3478' },
   ],
-  // Enhanced configuration for mobile networks and same-machine testing
+  // Enhanced configuration for all network types
   iceCandidatePoolSize: 10,
   iceTransportPolicy: 'all' as RTCIceTransportPolicy,
 };

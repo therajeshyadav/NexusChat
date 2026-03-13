@@ -265,21 +265,59 @@ class VoiceChannelManager {
   }
 
   private createPeerConnection(userId: string): void {
-    console.log('� Creating peer connection for user:', userId);
+    console.log('🔗 Creating peer connection for user:', userId);
     console.log('🔗 Local stream available:', !!this.localStream);
     console.log('🔗 Local stream tracks:', this.localStream?.getTracks().length || 0);
     
+    // Production-grade WebRTC configuration (works everywhere)
     const config: RTCConfiguration = {
       iceServers: [
+        // Multiple STUN servers for redundancy
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        
+        // Cloudflare STUN (fast & reliable)
+        { urls: 'stun:stun.cloudflare.com:3478' },
+        
+        // Multiple TURN servers for NAT traversal
         {
           urls: 'turn:openrelay.metered.ca:80',
           username: 'openrelayproject',
           credential: 'openrelayproject',
         },
+        {
+          urls: 'turn:openrelay.metered.ca:443',
+          username: 'openrelayproject',
+          credential: 'openrelayproject',
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+          username: 'openrelayproject',
+          credential: 'openrelayproject',
+        },
+        
+        // Additional reliable TURN servers
+        {
+          urls: 'turn:relay1.expressturn.com:3478',
+          username: 'ef3CYGPKLM2X2LC40V',
+          credential: 'Hj8pDKpz92KmF5r6',
+        },
+        
+        // Twilio STUN (enterprise grade)
+        { urls: 'stun:global.stun.twilio.com:3478' },
       ],
+      
+      // Optimized settings for all networks
+      iceCandidatePoolSize: 10,
+      iceTransportPolicy: 'all',
+      bundlePolicy: 'max-bundle',
+      rtcpMuxPolicy: 'require',
     };
+    
+    console.log('🔧 Using production-grade WebRTC config');
 
     const peerConnection = new RTCPeerConnection(config);
     this.peerConnections.set(userId, peerConnection);
