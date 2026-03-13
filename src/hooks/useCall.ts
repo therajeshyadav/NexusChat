@@ -173,9 +173,37 @@ export function useCall() {
       const localStream = webrtcManager.getLocalStream();
       if (localStream && localVideoRef.current) {
         localVideoRef.current.srcObject = localStream;
+        console.log('✅ Local video stream assigned');
       }
     }
   }, [callState]);
+
+  // Force video element to be ready for video calls
+  useEffect(() => {
+    if (currentCall?.callType === 'video' && callState === 'connected') {
+      // Ensure video element is mounted and ready
+      const checkVideoElement = () => {
+        if (remoteVideoRef.current) {
+          console.log('✅ Video element is ready for stream assignment');
+          const videoElement = remoteVideoRef.current as HTMLVideoElement;
+          
+          // If stream is already available but not assigned, assign it
+          if (remoteStream && !videoElement.srcObject) {
+            console.log('🔧 Assigning existing stream to video element');
+            videoElement.srcObject = remoteStream;
+            videoElement.muted = false;
+            videoElement.volume = 1.0;
+            videoElement.play().catch(err => console.error('Video play error:', err));
+          }
+        } else {
+          console.log('⚠️ Video element not ready, checking again...');
+          setTimeout(checkVideoElement, 50);
+        }
+      };
+      
+      checkVideoElement();
+    }
+  }, [currentCall?.callType, callState, remoteStream]);
 
   // Update remote audio/video when stream is available
   useEffect(() => {
@@ -257,58 +285,83 @@ export function useCall() {
         assignAudioStream();
       } else if (currentCall.callType === 'video') {
         // For video calls, assign to video element AND ensure audio tracks are enabled
-        if (remoteVideoRef.current) {
-          console.log('🎵 Setting remote stream to video element for video call');
-          console.log('🎵 Remote stream tracks:', remoteStream.getTracks().map(t => ({ kind: t.kind, enabled: t.enabled, muted: t.muted })));
-          
-          // IMPORTANT: Unmute all remote audio tracks for video calls too
-          remoteStream.getAudioTracks().forEach(track => {
-            console.log('🔧 Unmuting remote audio track in video call:', track.id);
-            track.enabled = true;
-          });
-          
+        const assignVideoStream = () => {
           const videoElement = remoteVideoRef.current as HTMLVideoElement;
-          videoElement.srcObject = remoteStream;
-          videoElement.muted = false; // CRITICAL: Don't mute video element for audio
-          videoElement.volume = 1.0;
-          
-          console.log('🔊 Video element audio setup:', {
-            muted: videoElement.muted,
-            volume: videoElement.volume,
-            autoplay: videoElement.autoplay,
-            hasStream: !!videoElement.srcObject,
-            audioTracks: remoteStream.getAudioTracks().length,
-            videoTracks: remoteStream.getVideoTracks().length
-          });
-          
-          // Force play video (which includes audio)
-          const playVideo = async () => {
-            try {
-              console.log('🎵 Attempting video play (with audio)');
-              await videoElement.play();
-              console.log('✅ Video element playing successfully with audio');
-            } catch (err) {
-              console.error('❌ Video play error:', err);
-              
-              // Add user interaction handler as fallback
-              const enableVideo = async () => {
-                try {
-                  await videoElement.play();
-                  console.log('✅ Video enabled after user interaction');
-                  document.removeEventListener('click', enableVideo);
-                } catch (e) {
-                  console.error('❌ Video failed even after user interaction:', e);
-                }
-              };
-              
-              document.addEventListener('click', enableVideo, { once: true });
-              console.log('🔧 Added click listener for video activation');
-            }
-          };
-          
-          // Wait for next tick to ensure DOM is ready
-          setTimeout(playVideo, 0);
-        }
+          if (videoElement) {
+            console.log('🎵 Setting remote stream to video element for video call');
+            console.log('🎵 Remote stream tracks:', remoteStream.getTracks().map(t => ({ kind: t.kind, enabled: t.enabled, muted: t.muted })));
+            
+            // IMPORTANT: Unmute all remote audio tracks for video calls too
+            remoteStream.getAudioTracks().forEach(track => {
+              console.log('🔧 Unmuting remote audio track in video call:', track.id);
+              track.enabled = true;
+            });
+            
+            // IMPORTANT: Enable all video tracks
+            remoteStream.getVideoTracks().forEach(track => {
+              console.log('🔧 Enabling remote video track in video call:', track.id);
+              track.enabled = true;
+            });
+            
+            videoElement.srcObject = remoteStream;
+            videoElement.muted = false; // CRITICAL: Don't mute video element for audio
+            videoElement.volume = 1.0;
+            
+            console.log('🔊 Video element audio setup:', {
+              muted: videoElement.muted,
+              volume: videoElement.volume,
+              autoplay: videoElement.autoplay,
+              hasStream: !!videoElement.srcObject,
+              audioTracks: remoteStream.getAudioTracks().length,
+              videoTracks: remoteStream.getVideoTracks().length
+            });
+            
+            // Force play video (which includes audio)
+            const playVideo = async () => {
+              try {
+                console.log('🎵 Attempting video play (with audio)');
+                await videoElement.play();
+                console.log('✅ Video element playing successfully with audio');
+              } catch (err) {
+                console.error('❌ Video play error:', err);
+                
+                // Retry after short delay
+                setTimeout(async () => {
+                  try {
+                    console.log('🔄 Retrying video play');
+                    await videoElement.play();
+                    console.log('✅ Video play retry successful');
+                  } catch (retryErr) {
+                    console.error('❌ Video retry failed:', retryErr);
+                    
+                    // Add user interaction handler as fallback
+                    const enableVideo = async () => {
+                      try {
+                        await videoElement.play();
+                        console.log('✅ Video enabled after user interaction');
+                        document.removeEventListener('click', enableVideo);
+                      } catch (e) {
+                        console.error('❌ Video failed even after user interaction:', e);
+                      }
+                    };
+                    
+                    document.addEventListener('click', enableVideo, { once: true });
+                    console.log('🔧 Added click listener for video activation');
+                  }
+                }, 100);
+              }
+            };
+            
+            // Wait for next tick to ensure DOM is ready
+            setTimeout(playVideo, 0);
+          } else {
+            console.log('⚠️ Video element not ready, retrying in 100ms...');
+            setTimeout(assignVideoStream, 100);
+          }
+        };
+        
+        // Start trying to assign the stream
+        assignVideoStream();
       }
     } else {
       console.log('🎵 useEffect conditions not met:', {

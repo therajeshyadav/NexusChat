@@ -142,6 +142,9 @@ export default function ActiveCallModal({
                       // Ensure video is not muted for audio
                       video.muted = false;
                       video.volume = 1.0;
+                      
+                      // Force play
+                      video.play().catch(err => console.error('📹 Video play failed:', err));
                     }
                   }}
                   onCanPlay={() => {
